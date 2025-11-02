@@ -231,7 +231,7 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
   }, [pdfName, displayName])
 
   return (
-    <Flex flex={1} direction="column" bg="gray.900" position="relative">
+    <Flex flex={1} direction="column" bg="gray.800" position="relative">
       <Toolbar
         onToggleSidebar={onToggleSidebar}
         pdfName={displayName}
@@ -250,7 +250,7 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
         position="relative"
         p={4}
         cursor="pointer"
-        bg="gray.900"
+        bg="gray.800"
         onClick={handleCanvasClick}
       >
         <canvas
@@ -258,7 +258,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
           style={{
             maxWidth: '100%',
             maxHeight: '100%',
-            boxShadow: '0 0.5rem 2rem rgba(0, 0, 0, 0.6)',
             borderRadius: '0.25rem'
           }}
         />

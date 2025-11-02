@@ -86,20 +86,18 @@ function Sidebar({ visible, onPdfSelect, currentPdfPath, urlParams }) {
     <Box
       w="80"
       bg="gray.800"
-      borderRight="1px"
-      borderColor="gray.700"
       overflowY="auto"
       transition="margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
       ml={visible ? 0 : '-80'}
     >
-      <Box bg="gray.900" p={3} borderBottom="1px" borderColor="gray.700">
+      <Box bg="gray.900" p={3}>
         <Heading size="md" display="flex" alignItems="center" gap={2}>
           <Icon as={BsFilePdfFill} color="blue.400" />
           PDF Theater
         </Heading>
       </Box>
 
-      <VStack spacing={2} p={2} px={3} borderBottom="1px" borderColor="gray.700">
+      <VStack spacing={2} p={2} px={3}>
         <HStack spacing={2} w="100%">
           <IconButton
             icon={<BsArrowLeft />}

@@ -38,7 +38,7 @@ function MilestoneBadges({ achievedMilestones }) {
               position="absolute"
               inset={-1}
               borderRadius="full"
-              bgGradient={`radial(${m.color}60 0%, transparent 70%)`}
+              bgGradient="radial(#88888860 0%, transparent 70%)"
               filter="blur(8px)"
               pointerEvents="none"
             />
@@ -53,13 +53,13 @@ function MilestoneBadges({ achievedMilestones }) {
               borderColor="#3a3a3a"
             />
 
-            {/* 中間リング（カラー） */}
+            {/* 中間リング（シルバー） */}
             <Box
               position="absolute"
               inset={1.5}
               borderRadius="full"
-              bgGradient={`linear(to-br, ${m.color}dd, ${m.color}88)`}
-              boxShadow={`inset 0 2px 4px rgba(255,255,255,0.2), inset 0 -2px 4px rgba(0,0,0,0.3)`}
+              bgGradient="linear(to-br, #b8b8b8, #808080)"
+              boxShadow="inset 0 2px 4px rgba(255,255,255,0.2), inset 0 -2px 4px rgba(0,0,0,0.3)"
             />
 
             {/* 内側リング（ダーク） */}
@@ -75,7 +75,7 @@ function MilestoneBadges({ achievedMilestones }) {
             <Icon
               as={m.icon}
               boxSize={8}
-              color={m.color}
+              color="#c0c0c0"
               position="absolute"
               top="50%"
               left="50%"

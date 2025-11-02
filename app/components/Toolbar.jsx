@@ -39,9 +39,7 @@ function Toolbar({
     <HStack
       py={2}
       px={3}
-      bg="gray.800"
-      borderBottom="1px"
-      borderColor="gray.700"
+      bg="gray.900"
       spacing={3}
       backdropFilter="blur(0.5rem)"
     >
