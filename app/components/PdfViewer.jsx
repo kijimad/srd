@@ -1,15 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Flex, Box } from '@chakra-ui/react'
-import Toolbar from './Toolbar'
+import { Flex, Box, IconButton } from '@chakra-ui/react'
+import { BsLayoutSidebar } from 'react-icons/bs'
 import ReadingStats from './ReadingStats'
 
-function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPage, initialIsTop }) {
+function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, isTopHalf, onPageChange, onStateUpdate }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
-  const [pageNum, setPageNum] = useState(initialPage)
-  const [isTopHalf, setIsTopHalf] = useState(initialIsTop)
   const [zoomLevel, setZoomLevel] = useState(1.0)
   const [timerKey, setTimerKey] = useState(0)
 
@@ -35,12 +33,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
   }, [pdfUrl, pdfjsLib])
 
   useEffect(() => {
-    // Update page and half when props change
-    setPageNum(initialPage)
-    setIsTopHalf(initialIsTop)
-  }, [initialPage, initialIsTop])
-
-  useEffect(() => {
     if (pdfDoc && pdfjsLib) {
       renderPage(pageNum, isTopHalf)
     }
@@ -57,6 +49,7 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
       })
       const doc = await loadingTask.promise
       setPdfDoc(doc)
+      onStateUpdate({ totalPages: doc.numPages })
     } catch (error) {
       console.error('Error loading PDF:', error)
     }
@@ -138,20 +131,18 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
   const onPrevPage = () => {
     if (isTopHalf) {
       if (pageNum <= 1) return
-      setPageNum(pageNum - 1)
-      setIsTopHalf(false)
+      onPageChange(pageNum - 1, false)
     } else {
-      setIsTopHalf(true)
+      onPageChange(pageNum, true)
     }
   }
 
   const onNextPage = () => {
     if (isTopHalf) {
-      setIsTopHalf(false)
+      onPageChange(pageNum, false)
     } else {
       if (pageNum >= pdfDoc?.numPages) return
-      setPageNum(pageNum + 1)
-      setIsTopHalf(true)
+      onPageChange(pageNum + 1, true)
     }
     setTimerKey(prev => prev + 1) // Reset timer
   }
@@ -167,13 +158,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
     } else {
       onNextPage()
     }
-  }
-
-  const handlePageChange = (newPageNum, newIsTop) => {
-    if (!pdfDoc) return
-    if (newPageNum < 1 || newPageNum > pdfDoc.numPages) return
-    setPageNum(newPageNum)
-    setIsTopHalf(newIsTop)
   }
 
   const handleKeyDown = (e) => {
@@ -220,26 +204,32 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, initialPa
     return () => window.removeEventListener('resize', handleResize)
   }, [pdfDoc, pageNum, isTopHalf])
 
-  const displayName = pdfName
-    ? pdfName.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
-    : 'Select a PDF from the list'
-
   useEffect(() => {
+    const displayName = pdfName
+      ? pdfName.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
+      : 'Select a PDF from the list'
     document.title = pdfName
       ? displayName + ' - Theater'
       : 'Theater'
-  }, [pdfName, displayName])
+  }, [pdfName])
 
   return (
     <Flex flex={1} direction="column" bg="gray.800" position="relative">
-      <Toolbar
-        onToggleSidebar={onToggleSidebar}
-        pdfName={displayName}
-        pageNum={pageNum}
-        totalPages={pdfDoc?.numPages || 0}
-        isTopHalf={isTopHalf}
-        onPageChange={handlePageChange}
-      />
+      {!sidebarVisible && (
+        <IconButton
+          icon={<BsLayoutSidebar />}
+          variant="solid"
+          size="sm"
+          onClick={onToggleSidebar}
+          position="absolute"
+          top={4}
+          right={4}
+          zIndex={1000}
+          aria-label="Toggle sidebar"
+          bg="gray.700"
+          _hover={{ bg: 'gray.600' }}
+        />
+      )}
       <Box
         ref={containerRef}
         flex={1}

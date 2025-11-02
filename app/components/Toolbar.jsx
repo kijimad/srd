@@ -10,9 +10,10 @@ import {
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
-  Box
+  Box,
+  Heading
 } from '@chakra-ui/react'
-import { BsLayoutSidebar, BsFileEarmarkText } from 'react-icons/bs'
+import { BsLayoutSidebar, BsFileEarmarkText, BsFilePdfFill } from 'react-icons/bs'
 
 function Toolbar({
   onToggleSidebar,
@@ -43,17 +44,11 @@ function Toolbar({
       spacing={3}
       backdropFilter="blur(0.5rem)"
     >
-      <HStack spacing={2} minW="50">
-        <IconButton
-          icon={<BsLayoutSidebar />}
-          variant="outline"
-          size="sm"
-          onClick={onToggleSidebar}
-          title="Toggle Sidebar"
-          aria-label="Toggle sidebar"
-        />
-        <Icon as={BsFileEarmarkText} color="cyan.400" />
-        <Text fontSize="xs" fontWeight="medium" noOfLines={1}>{pdfName}</Text>
+      <HStack spacing={3}>
+        <Heading size="md" display="flex" alignItems="center" gap={2}>
+          <Icon as={BsFilePdfFill} color="blue.400" />
+          {pdfName}
+        </Heading>
       </HStack>
 
       <Flex flex={1} align="center" px={4}>
@@ -75,6 +70,15 @@ function Toolbar({
       <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono" minW="22" textAlign="center">
         {pageInfo}
       </Text>
+
+      <IconButton
+        icon={<BsLayoutSidebar />}
+        variant="outline"
+        size="sm"
+        onClick={onToggleSidebar}
+        title="Toggle Sidebar"
+        aria-label="Toggle sidebar"
+      />
     </HStack>
   )
 }
