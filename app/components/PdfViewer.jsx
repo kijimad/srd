@@ -45,7 +45,8 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
         url: url,
         cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/cmaps/',
         cMapPacked: true,
-        standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/standard_fonts/'
+        standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/standard_fonts/',
+        wasmUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/wasm/',
       })
       const doc = await loadingTask.promise
       setPdfDoc(doc)
