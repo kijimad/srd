@@ -35,3 +35,9 @@ docker run -d --name srd-dev \
 npm install
 npm run dev
 ```
+
+## TODO
+
+- PDF表示前にスピナー表示する
+- PDFが発見できなかったときは表示する
+- タブを切り替えたときに再描画する

@@ -206,6 +206,17 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
   }, [pdfDoc, pageNum, isTopHalf])
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && pdfDoc) {
+        renderPage(pageNum, isTopHalf)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [pdfDoc, pageNum, isTopHalf])
+
+  useEffect(() => {
     const displayName = pdfName
       ? pdfName.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
       : 'Select a PDF from the list'
