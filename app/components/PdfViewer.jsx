@@ -3,13 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Flex, Box, IconButton } from '@chakra-ui/react'
 import { BsLayoutSidebar } from 'react-icons/bs'
-import ReadingStats from './ReadingStats'
 
 function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, isTopHalf, onPageChange, onStateUpdate }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(1.0)
-  const [timerKey, setTimerKey] = useState(0)
 
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -145,7 +143,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
       if (pageNum >= pdfDoc?.numPages) return
       onPageChange(pageNum + 1, true)
     }
-    setTimerKey(prev => prev + 1) // Reset timer
   }
 
   const handleCanvasClick = (e) => {
@@ -263,14 +260,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
             borderRadius: '0.25rem'
           }}
         />
-      </Box>
-      <Box
-        position="fixed"
-        bottom={4}
-        right={4}
-        zIndex={1000}
-      >
-        <ReadingStats timerKey={timerKey} pageNum={pageNum} isTopHalf={isTopHalf} pdfName={pdfName} />
       </Box>
     </Flex>
   )
