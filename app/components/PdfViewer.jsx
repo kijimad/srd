@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Flex, Box, IconButton } from '@chakra-ui/react'
+import { Flex, Box, IconButton, Text } from '@chakra-ui/react'
 import { BsLayoutSidebar } from 'react-icons/bs'
 
 function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, isTopHalf, onPageChange, onStateUpdate }) {
@@ -214,12 +214,12 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
   }, [pdfDoc, pageNum, isTopHalf])
 
   useEffect(() => {
-    const displayName = pdfName
-      ? pdfName.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
-      : 'Select a PDF from the list'
-    document.title = pdfName
-      ? displayName + ' - Theater'
-      : 'Theater'
+    if (pdfName) {
+      const displayName = pdfName.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
+      document.title = displayName + ' - Theater'
+    } else {
+      document.title = 'Theater'
+    }
   }, [pdfName])
 
   return (
@@ -248,18 +248,22 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
         overflow="hidden"
         position="relative"
         p={4}
-        cursor="pointer"
+        cursor={pdfUrl ? 'pointer' : 'default'}
         bg="gray.800"
         onClick={handleCanvasClick}
       >
-        <canvas
-          ref={canvasRef}
-          style={{
-            maxWidth: '100%',
-            maxHeight: '100%',
-            borderRadius: '0.25rem'
-          }}
-        />
+        {pdfUrl ? (
+          <canvas
+            ref={canvasRef}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              borderRadius: '0.25rem'
+            }}
+          />
+        ) : (
+          <Text color="gray.500">サイドバーからPDFを選択してください</Text>
+        )}
       </Box>
     </Flex>
   )

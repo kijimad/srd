@@ -61,7 +61,7 @@ export default function MainContent() {
 
   const displayName = currentPdf?.name
     ? currentPdf.name.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
-    : 'Select a PDF from the list'
+    : '----'
 
   return (
     <Flex h="100vh" overflow="hidden" direction="column">
