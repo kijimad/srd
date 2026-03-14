@@ -3,21 +3,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { Flex, Box, IconButton, Text } from '@chakra-ui/react'
 import { BsLayoutSidebar } from 'react-icons/bs'
+import SplitPdfView from './SplitPdfView'
+import FullPdfView from './FullPdfView'
 
-function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, isTopHalf, onPageChange, onStateUpdate }) {
+function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, isTopHalf, splitMode, onPageChange, onStateUpdate }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(1.0)
 
-  const canvasRef = useRef(null)
   const containerRef = useRef(null)
-  const baseScaleRef = useRef(1.0)
-  const renderTaskRef = useRef(null)
-  const outputScale = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) * 2 : 2
-  const OVERLAP_RATIO = 0.04 // 4% overlap between top and bottom halves
 
   useEffect(() => {
-    // Load PDF.js dynamically on client side only
     import('pdfjs-dist').then((pdfjs) => {
       pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/build/pdf.worker.mjs'
       setPdfjsLib(pdfjs)
@@ -29,12 +25,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
       loadPDF(pdfUrl)
     }
   }, [pdfUrl, pdfjsLib])
-
-  useEffect(() => {
-    if (pdfDoc && pdfjsLib) {
-      renderPage(pageNum, isTopHalf)
-    }
-  }, [pdfDoc, pageNum, isTopHalf, zoomLevel, sidebarVisible, pdfjsLib])
 
   const loadPDF = async (url) => {
     if (!pdfjsLib) return
@@ -54,91 +44,40 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
     }
   }
 
-  const calculateScale = (page) => {
-    if (!containerRef.current) return 1.0
-    const containerWidth = containerRef.current.clientWidth - 40
-    const containerHeight = containerRef.current.clientHeight - 40
-
-    const viewport = page.getViewport({ scale: 1.0 })
-    const halfHeight = viewport.height / 2
-    const displayHeight = halfHeight * (1 + OVERLAP_RATIO)
-
-    const scaleX = containerWidth / viewport.width
-    const scaleY = containerHeight / displayHeight
-
-    return Math.min(scaleX, scaleY)
-  }
-
-  const renderPage = async (num, topHalf) => {
-    if (!pdfDoc || !canvasRef.current) return
-
-    // Cancel previous render task if it exists
-    if (renderTaskRef.current) {
-      renderTaskRef.current.cancel()
-    }
-
-    const page = await pdfDoc.getPage(num)
-    baseScaleRef.current = calculateScale(page)
-    const scale = baseScaleRef.current * zoomLevel
-
-    const viewport = page.getViewport({ scale })
-    const halfHeight = viewport.height / 2
-    const displayHeight = halfHeight * (1 + OVERLAP_RATIO)
-
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-
-    canvas.width = Math.floor(viewport.width * outputScale)
-    canvas.height = Math.floor(displayHeight * outputScale)
-    canvas.style.width = Math.floor(viewport.width) + 'px'
-    canvas.style.height = Math.floor(displayHeight) + 'px'
-
-    const yOffset = topHalf ? 0 : -halfHeight * (1 - OVERLAP_RATIO)
-    const transform = outputScale !== 1
-      ? [outputScale, 0, 0, outputScale, 0, yOffset * outputScale]
-      : [1, 0, 0, 1, 0, yOffset]
-
-    const renderContext = {
-      canvasContext: ctx,
-      transform: transform,
-      viewport: viewport
-    }
-
-    renderTaskRef.current = page.render(renderContext)
-    try {
-      await renderTaskRef.current.promise
-      renderTaskRef.current = null
-      updateURL()
-    } catch (error) {
-      // Ignore cancellation errors
-      if (error.name !== 'RenderingCancelledException') {
-        console.error('Rendering error:', error)
-      }
-    }
-  }
-
   const updateURL = () => {
     if (!pdfDoc || !pdfName) return
     const params = new URLSearchParams()
     params.set('file', pdfName)
     params.set('page', pageNum)
-    params.set('half', isTopHalf ? 'top' : 'bottom')
+    if (splitMode) {
+      params.set('half', isTopHalf ? 'top' : 'bottom')
+    }
     const newURL = window.location.pathname + '?' + params.toString()
     window.history.pushState({}, '', newURL)
   }
 
   const onPrevPage = () => {
-    if (isTopHalf) {
-      if (pageNum <= 1) return
-      onPageChange(pageNum - 1, false)
+    if (splitMode) {
+      if (isTopHalf) {
+        if (pageNum <= 1) return
+        onPageChange(pageNum - 1, false)
+      } else {
+        onPageChange(pageNum, true)
+      }
     } else {
-      onPageChange(pageNum, true)
+      if (pageNum <= 1) return
+      onPageChange(pageNum - 1, true)
     }
   }
 
   const onNextPage = () => {
-    if (isTopHalf) {
-      onPageChange(pageNum, false)
+    if (splitMode) {
+      if (isTopHalf) {
+        onPageChange(pageNum, false)
+      } else {
+        if (pageNum >= pdfDoc?.numPages) return
+        onPageChange(pageNum + 1, true)
+      }
     } else {
       if (pageNum >= pdfDoc?.numPages) return
       onPageChange(pageNum + 1, true)
@@ -159,7 +98,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
   }
 
   const handleKeyDown = (e) => {
-    // 文字入力中はショートカットを無視する
     const target = e.target
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
       return
@@ -189,29 +127,7 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [pdfDoc, pageNum, isTopHalf])
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (pdfDoc) {
-        renderPage(pageNum, isTopHalf)
-      }
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [pdfDoc, pageNum, isTopHalf])
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && pdfDoc) {
-        renderPage(pageNum, isTopHalf)
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [pdfDoc, pageNum, isTopHalf])
+  }, [pdfDoc, pageNum, isTopHalf, splitMode])
 
   useEffect(() => {
     if (pdfName) {
@@ -221,6 +137,39 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
       document.title = 'Theater'
     }
   }, [pdfName])
+
+  const renderPdfView = () => {
+    if (!pdfUrl) {
+      return <Text color="gray.500">サイドバーからPDFを選択してください</Text>
+    }
+
+    if (splitMode) {
+      return (
+        <SplitPdfView
+          pdfDoc={pdfDoc}
+          pdfjsLib={pdfjsLib}
+          pageNum={pageNum}
+          isTopHalf={isTopHalf}
+          zoomLevel={zoomLevel}
+          containerRef={containerRef}
+          sidebarVisible={sidebarVisible}
+          onRenderComplete={updateURL}
+        />
+      )
+    } else {
+      return (
+        <FullPdfView
+          pdfDoc={pdfDoc}
+          pdfjsLib={pdfjsLib}
+          pageNum={pageNum}
+          zoomLevel={zoomLevel}
+          containerRef={containerRef}
+          sidebarVisible={sidebarVisible}
+          onRenderComplete={updateURL}
+        />
+      )
+    }
+  }
 
   return (
     <Flex flex={1} direction="column" bg="gray.800" position="relative">
@@ -252,18 +201,7 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
         bg="gray.800"
         onClick={handleCanvasClick}
       >
-        {pdfUrl ? (
-          <canvas
-            ref={canvasRef}
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              borderRadius: '0.25rem'
-            }}
-          />
-        ) : (
-          <Text color="gray.500">サイドバーからPDFを選択してください</Text>
-        )}
+        {renderPdfView()}
       </Box>
     </Flex>
   )

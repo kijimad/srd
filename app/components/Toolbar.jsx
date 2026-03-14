@@ -13,7 +13,7 @@ import {
   Box,
   Heading
 } from '@chakra-ui/react'
-import { BsLayoutSidebar, BsFileEarmarkText, BsFilePdfFill } from 'react-icons/bs'
+import { BsLayoutSidebar, BsFileEarmarkText, BsFilePdfFill, BsLayoutSplit, BsSquare } from 'react-icons/bs'
 
 function Toolbar({
   onToggleSidebar,
@@ -21,19 +21,29 @@ function Toolbar({
   pageNum,
   totalPages,
   isTopHalf,
-  onPageChange
+  onPageChange,
+  splitMode,
+  onToggleSplitMode
 }) {
   const halfText = isTopHalf ? '上' : '下'
-  const pageInfo = totalPages > 0 ? `${pageNum} / ${totalPages} (${halfText})` : ''
+  const pageInfo = splitMode
+    ? (totalPages > 0 ? `${pageNum} / ${totalPages} (${halfText})` : '')
+    : (totalPages > 0 ? `${pageNum} / ${totalPages}` : '')
 
-  // Calculate slider value (half-page units)
-  const currentHalfPage = totalPages > 0 ? (pageNum - 1) * 2 + (isTopHalf ? 1 : 2) : 0
-  const maxHalfPages = totalPages * 2
+  // Calculate slider value
+  const currentSliderValue = splitMode
+    ? (totalPages > 0 ? (pageNum - 1) * 2 + (isTopHalf ? 1 : 2) : 0)
+    : pageNum
+  const maxSliderValue = splitMode ? totalPages * 2 : totalPages
 
   const handleSliderChange = (value) => {
-    const newPageNum = Math.floor((value - 1) / 2) + 1
-    const newIsTop = value % 2 === 1
-    onPageChange(newPageNum, newIsTop)
+    if (splitMode) {
+      const newPageNum = Math.floor((value - 1) / 2) + 1
+      const newIsTop = value % 2 === 1
+      onPageChange(newPageNum, newIsTop)
+    } else {
+      onPageChange(value, true)
+    }
   }
 
   return (
@@ -53,9 +63,9 @@ function Toolbar({
 
       <Flex flex={1} align="center" px={4}>
         <Slider
-          value={currentHalfPage}
+          value={currentSliderValue}
           min={1}
-          max={maxHalfPages}
+          max={maxSliderValue}
           step={1}
           onChange={handleSliderChange}
           isDisabled={totalPages === 0}
@@ -70,6 +80,15 @@ function Toolbar({
       <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono" minW="22" textAlign="center">
         {pageInfo}
       </Text>
+
+      <IconButton
+        icon={splitMode ? <BsLayoutSplit /> : <BsSquare />}
+        variant="outline"
+        size="sm"
+        onClick={onToggleSplitMode}
+        title={splitMode ? '全体表示に切替' : '上下分割に切替'}
+        aria-label="Toggle split mode"
+      />
 
       <IconButton
         icon={<BsLayoutSidebar />}

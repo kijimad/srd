@@ -13,12 +13,19 @@ export default function MainContent() {
   const [isTopHalf, setIsTopHalf] = useState(true)
   const [urlParams, setUrlParams] = useState(null)
   const [totalPages, setTotalPages] = useState(0)
+  const [splitMode, setSplitMode] = useState(true) // true: 上下分割, false: 全体表示
 
   useEffect(() => {
     // Restore sidebar state from localStorage
     const saved = localStorage.getItem('sidebarVisible')
     if (saved !== null) {
       setSidebarVisible(saved !== 'false')
+    }
+
+    // Restore split mode from localStorage
+    const savedSplitMode = localStorage.getItem('splitMode')
+    if (savedSplitMode !== null) {
+      setSplitMode(savedSplitMode !== 'false')
     }
 
     // Parse URL parameters
@@ -40,6 +47,16 @@ export default function MainContent() {
     const newValue = !sidebarVisible
     setSidebarVisible(newValue)
     localStorage.setItem('sidebarVisible', newValue)
+  }
+
+  const toggleSplitMode = () => {
+    const newValue = !splitMode
+    setSplitMode(newValue)
+    localStorage.setItem('splitMode', newValue)
+    // 全体表示に切り替えたときは常に上半分状態にリセット
+    if (!newValue) {
+      setIsTopHalf(true)
+    }
   }
 
   const handlePdfLoad = (pdfInfo) => {
@@ -73,6 +90,8 @@ export default function MainContent() {
           totalPages={totalPages}
           isTopHalf={isTopHalf}
           onPageChange={handlePageChange}
+          splitMode={splitMode}
+          onToggleSplitMode={toggleSplitMode}
         />
       )}
       <Flex flex={1} overflow="hidden">
@@ -89,6 +108,7 @@ export default function MainContent() {
           pdfName={currentPdf?.name}
           pageNum={currentPage}
           isTopHalf={isTopHalf}
+          splitMode={splitMode}
           onPageChange={handlePageChange}
           onStateUpdate={handlePdfStateUpdate}
         />
