@@ -173,21 +173,6 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
 
   return (
     <Flex flex={1} direction="column" bg="gray.800" position="relative">
-      {!sidebarVisible && (
-        <IconButton
-          icon={<BsLayoutSidebar />}
-          variant="solid"
-          size="sm"
-          onClick={onToggleSidebar}
-          position="absolute"
-          top={4}
-          right={4}
-          zIndex={1000}
-          aria-label="Toggle sidebar"
-          bg="gray.700"
-          _hover={{ bg: 'gray.600' }}
-        />
-      )}
       <Box
         ref={containerRef}
         flex={1}
@@ -196,7 +181,9 @@ function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, 
         alignItems="center"
         overflow="hidden"
         position="relative"
-        p={4}
+        pt={1}
+        px={4}
+        pb={4}
         cursor={pdfUrl ? 'pointer' : 'default'}
         bg="gray.800"
         onClick={handleCanvasClick}

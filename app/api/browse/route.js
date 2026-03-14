@@ -39,6 +39,9 @@ function listDirectory(dir, basePath = '') {
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const requestedPath = searchParams.get('path') || '.'
+  const query = searchParams.get('q') || ''
+  const page = parseInt(searchParams.get('page')) || 1
+  const limit = parseInt(searchParams.get('limit')) || 50
   const baseDir = process.env.PDF_DIR || process.cwd()
 
   // Security: prevent directory traversal
@@ -59,9 +62,26 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Not a directory' }, { status: 400 })
   }
 
-  const items = listDirectory(absolutePath, safePath)
+  let items = listDirectory(absolutePath, safePath)
+
+  // Filter by query (case-insensitive filename search)
+  if (query) {
+    const lowerQuery = query.toLowerCase()
+    items = items.filter(item => item.name.toLowerCase().includes(lowerQuery))
+  }
+
+  const total = items.length
+  const startIndex = (page - 1) * limit
+  const endIndex = startIndex + limit
+  const paginatedItems = items.slice(startIndex, endIndex)
+  const hasMore = endIndex < total
+
   return NextResponse.json({
     currentPath: safePath,
-    items: items
+    items: paginatedItems,
+    total,
+    page,
+    limit,
+    hasMore
   })
 }

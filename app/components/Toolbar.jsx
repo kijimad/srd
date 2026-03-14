@@ -13,7 +13,7 @@ import {
   Box,
   Heading
 } from '@chakra-ui/react'
-import { BsLayoutSidebar, BsFileEarmarkText, BsFilePdfFill, BsLayoutSplit, BsSquare } from 'react-icons/bs'
+import { BsLayoutSidebar, BsFilePdfFill, BsViewStacked, BsSquare } from 'react-icons/bs'
 
 function Toolbar({
   onToggleSidebar,
@@ -82,7 +82,7 @@ function Toolbar({
       </Text>
 
       <IconButton
-        icon={splitMode ? <BsLayoutSplit /> : <BsSquare />}
+        icon={splitMode ? <BsViewStacked /> : <BsSquare />}
         variant="outline"
         size="sm"
         onClick={onToggleSplitMode}
