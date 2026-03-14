@@ -143,7 +143,6 @@ export default function MainContent() {
         )}
         <PdfViewer
           sidebarVisible={sidebarVisible}
-          onToggleSidebar={toggleSidebar}
           pdfUrl={currentPdf?.url}
           pdfName={currentPdf?.name}
           pageNum={currentPage}

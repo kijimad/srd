@@ -118,20 +118,18 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
 
   // Load PDF from URL parameters
   useEffect(() => {
-    if (urlParams && items.length > 0 && !hasLoadedFromUrl && currentPath === '.') {
-      const matchingItem = items.find(item => item.path === urlParams.file)
-      if (matchingItem) {
-        onPdfSelect({
-          url: '/api/pdf/' + matchingItem.path,
-          path: matchingItem.path,
-          name: matchingItem.name,
-          initialPage: urlParams.page,
-          initialIsTop: urlParams.isTop
-        })
-        setHasLoadedFromUrl(true)
-      }
+    if (urlParams && !hasLoadedFromUrl) {
+      const fileName = urlParams.file.split('/').pop()
+      onPdfSelect({
+        url: '/api/pdf/' + urlParams.file,
+        path: urlParams.file,
+        name: fileName,
+        initialPage: urlParams.page,
+        initialIsTop: urlParams.isTop
+      })
+      setHasLoadedFromUrl(true)
     }
-  }, [urlParams, items, hasLoadedFromUrl, currentPath, onPdfSelect])
+  }, [urlParams, hasLoadedFromUrl, onPdfSelect])
 
   // Scroll to selected item
   useEffect(() => {

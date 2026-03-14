@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Flex, Box, IconButton, Text } from '@chakra-ui/react'
-import { BsLayoutSidebar } from 'react-icons/bs'
+import { Flex, Box, Text } from '@chakra-ui/react'
 import SplitPdfView from './SplitPdfView'
 import FullPdfView from './FullPdfView'
 
-function PdfViewer({ sidebarVisible, onToggleSidebar, pdfUrl, pdfName, pageNum, isTopHalf, splitMode, onPageChange, onStateUpdate }) {
+function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitMode, onPageChange, onStateUpdate }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(1.0)
