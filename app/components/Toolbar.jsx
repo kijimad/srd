@@ -4,15 +4,11 @@ import {
   HStack,
   IconButton,
   Text,
-  Flex,
   Icon,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
   Heading,
   Select,
   ButtonGroup,
+  Spacer,
 } from '@chakra-ui/react'
 import { BsLayoutSidebar, BsFilePdfFill, BsZoomIn, BsZoomOut } from 'react-icons/bs'
 
@@ -36,7 +32,6 @@ function Toolbar({
   pdfName,
   pageNum,
   totalPages,
-  onPageChange,
   scaleValue,
   currentScale,
   onScaleValueChange,
@@ -46,13 +41,8 @@ function Toolbar({
   const pageInfo = totalPages > 0 ? `${pageNum} / ${totalPages}` : ''
   const scalePercent = Math.round(currentScale * 100)
 
-  const handleSliderChange = (value) => {
-    onPageChange(value)
-  }
-
   const handleScaleSelectChange = (e) => {
     const value = e.target.value
-    // Check if it's a number
     const numValue = parseFloat(value)
     if (!isNaN(numValue)) {
       onScaleValueChange(numValue)
@@ -61,10 +51,8 @@ function Toolbar({
     }
   }
 
-  // Get current select value
   const getSelectValue = () => {
     if (typeof scaleValue === 'number') {
-      // Find matching option or return empty
       const match = SCALE_OPTIONS.find(opt => parseFloat(opt.value) === scaleValue)
       return match ? match.value : ''
     }
@@ -79,30 +67,14 @@ function Toolbar({
       spacing={3}
       backdropFilter="blur(0.5rem)"
     >
-      <HStack spacing={3}>
-        <Heading size="md" display="flex" alignItems="center" gap={2}>
-          <Icon as={BsFilePdfFill} color="blue.400" />
-          {pdfName}
-        </Heading>
-      </HStack>
+      <Heading size="md" display="flex" alignItems="center" gap={2}>
+        <Icon as={BsFilePdfFill} color="blue.400" />
+        {pdfName}
+      </Heading>
 
-      <Flex flex={1} align="center" px={4}>
-        <Slider
-          value={pageNum}
-          min={1}
-          max={totalPages}
-          step={1}
-          onChange={handleSliderChange}
-          isDisabled={totalPages === 0}
-        >
-          <SliderTrack bg="gray.700">
-            <SliderFilledTrack bg="cyan.400" />
-          </SliderTrack>
-          <SliderThumb boxSize={4} bg="cyan.400" />
-        </Slider>
-      </Flex>
+      <Spacer />
 
-      <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono" minW="70px" textAlign="center">
+      <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono">
         {pageInfo}
       </Text>
 

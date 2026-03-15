@@ -135,7 +135,6 @@ export default function MainContent() {
         pdfName={displayName}
         pageNum={currentPage}
         totalPages={totalPages}
-        onPageChange={handlePageChange}
         scaleValue={scaleValue}
         currentScale={currentScale}
         onScaleValueChange={handleScaleValueChange}
