@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Flex, Box, Text } from '@chakra-ui/react'
+import { Flex, Box, Text, Spinner, VStack } from '@chakra-ui/react'
 import SplitPdfView from './SplitPdfView'
 import FullPdfView from './FullPdfView'
 
 function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitMode, onPageChange, onStateUpdate }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1.0)
 
   const containerRef = useRef(null)
@@ -27,6 +28,8 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitM
 
   const loadPDF = async (url) => {
     if (!pdfjsLib) return
+    setPdfDoc(null)
+    setIsLoading(true)
     try {
       const loadingTask = pdfjsLib.getDocument({
         url: url,
@@ -40,6 +43,8 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitM
       onStateUpdate({ totalPages: doc.numPages })
     } catch (error) {
       console.error('Error loading PDF:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -140,6 +145,15 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitM
   const renderPdfView = () => {
     if (!pdfUrl) {
       return <Text color="gray.500">サイドバーからPDFを選択してください</Text>
+    }
+
+    if (isLoading || !pdfDoc) {
+      return (
+        <VStack spacing={3}>
+          <Spinner size="lg" color="blue.400" thickness="3px" />
+          <Text color="gray.500">読み込み中...</Text>
+        </VStack>
+      )
     }
 
     if (splitMode) {
