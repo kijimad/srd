@@ -1,99 +1,160 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Box } from '@chakra-ui/react'
+import 'pdfjs-dist/web/pdf_viewer.css'
 
-function FullPdfView({ pdfDoc, pdfjsLib, pageNum, zoomLevel, containerRef, sidebarVisible, onRenderComplete }) {
-  const canvasRef = useRef(null)
-  const renderTaskRef = useRef(null)
-  const outputScale = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) * 2 : 2
+function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, onPageChange, onScaleChange }) {
+  const viewerContainerRef = useRef(null)
+  const viewerRef = useRef(null)
+  const eventBusRef = useRef(null)
+  const [viewerReady, setViewerReady] = useState(false)
+  const lastScaleValue = useRef(scaleValue)
+  const initializedRef = useRef(false)
+  const initialPageRef = useRef(pageNum)
 
-  const calculateScale = (page) => {
-    if (!containerRef.current) return 1.0
-    const containerWidth = containerRef.current.clientWidth - 40
-    const containerHeight = containerRef.current.clientHeight - 40
+  // Initialize PDF Viewer
+  useEffect(() => {
+    if (!viewerContainerRef.current || !pdfjsLib || initializedRef.current) return
 
-    const viewport = page.getViewport({ scale: 1.0 })
-    const scaleX = containerWidth / viewport.width
-    const scaleY = containerHeight / viewport.height
-    return Math.min(scaleX, scaleY)
-  }
+    const initViewer = async () => {
+      try {
+        const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer.mjs')
 
-  const renderPage = async () => {
-    if (!pdfDoc || !canvasRef.current) return
+        const eventBus = new pdfjsViewer.EventBus()
+        eventBusRef.current = eventBus
 
-    if (renderTaskRef.current) {
-      renderTaskRef.current.cancel()
-    }
+        const pdfLinkService = new pdfjsViewer.PDFLinkService({
+          eventBus,
+        })
 
-    const page = await pdfDoc.getPage(pageNum)
-    const baseScale = calculateScale(page)
-    const scale = baseScale * zoomLevel
+        const container = viewerContainerRef.current
+        const viewer = container.querySelector('.pdfViewer')
 
-    const viewport = page.getViewport({ scale })
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+        if (!viewer) {
+          console.error('Could not find .pdfViewer element')
+          return
+        }
 
-    canvas.width = Math.floor(viewport.width * outputScale)
-    canvas.height = Math.floor(viewport.height * outputScale)
-    canvas.style.width = Math.floor(viewport.width) + 'px'
-    canvas.style.height = Math.floor(viewport.height) + 'px'
+        const pdfViewer = new pdfjsViewer.PDFViewer({
+          container: container,
+          viewer: viewer,
+          eventBus,
+          linkService: pdfLinkService,
+          textLayerMode: 2,
+          removePageBorders: true,
+        })
 
-    const transform = outputScale !== 1
-      ? [outputScale, 0, 0, outputScale, 0, 0]
-      : null
+        pdfLinkService.setViewer(pdfViewer)
+        viewerRef.current = pdfViewer
+        initializedRef.current = true
 
-    renderTaskRef.current = page.render({
-      canvasContext: ctx,
-      transform: transform,
-      viewport: viewport
-    })
+        eventBus.on('pagechanging', (evt) => {
+          onPageChange?.(evt.pageNumber)
+        })
 
-    try {
-      await renderTaskRef.current.promise
-      renderTaskRef.current = null
-      onRenderComplete?.()
-    } catch (error) {
-      if (error.name !== 'RenderingCancelledException') {
-        console.error('Rendering error:', error)
+        eventBus.on('scalechanging', (evt) => {
+          onScaleChange?.(evt.scale)
+        })
+
+        eventBus.on('pagesinit', () => {
+          if (typeof scaleValue === 'number') {
+            pdfViewer.currentScale = scaleValue
+          } else {
+            pdfViewer.currentScaleValue = scaleValue || 'page-width'
+          }
+          // Set initial page
+          if (initialPageRef.current && initialPageRef.current > 0) {
+            pdfViewer.currentPageNumber = initialPageRef.current
+          }
+        })
+
+        setViewerReady(true)
+      } catch (error) {
+        console.error('Error initializing PDF viewer:', error)
       }
     }
-  }
 
-  useEffect(() => {
-    if (pdfDoc && pdfjsLib) {
-      renderPage()
-    }
-  }, [pdfDoc, pageNum, zoomLevel, sidebarVisible, pdfjsLib])
+    initViewer()
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (pdfDoc && pdfjsLib) {
-        renderPage()
+    return () => {
+      if (viewerRef.current) {
+        viewerRef.current.cleanup()
+        viewerRef.current = null
+        initializedRef.current = false
       }
     }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [pdfDoc, pageNum, zoomLevel, pdfjsLib])
+  }, [pdfjsLib])
 
+  // Load PDF document
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && pdfDoc && pdfjsLib) {
-        renderPage()
-      }
+    if (!viewerRef.current || !pdfDoc || !viewerReady) return
+
+    // Update initial page ref before loading new document
+    initialPageRef.current = pageNum
+    viewerRef.current.setDocument(pdfDoc)
+  }, [pdfDoc, viewerReady])
+
+  // Handle scale changes
+  useEffect(() => {
+    if (!viewerRef.current || !viewerReady) return
+    if (scaleValue === lastScaleValue.current) return
+
+    lastScaleValue.current = scaleValue
+
+    if (typeof scaleValue === 'number') {
+      viewerRef.current.currentScale = scaleValue
+    } else {
+      viewerRef.current.currentScaleValue = scaleValue
     }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [pdfDoc, pageNum, zoomLevel, pdfjsLib])
+  }, [scaleValue, viewerReady])
+
+  // Handle page changes from external source (slider)
+  useEffect(() => {
+    if (!viewerRef.current || !viewerReady) return
+
+    if (viewerRef.current.currentPageNumber !== pageNum) {
+      viewerRef.current.currentPageNumber = pageNum
+    }
+  }, [pageNum, viewerReady])
+
+  // Trigger resize when sidebar toggles
+  useEffect(() => {
+    if (!viewerRef.current || !viewerReady) return
+
+    const timer = setTimeout(() => {
+      if (viewerRef.current) {
+        viewerRef.current.update()
+      }
+    }, 150)
+
+    return () => clearTimeout(timer)
+  }, [sidebarVisible, viewerReady])
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        maxWidth: '100%',
-        maxHeight: '100%',
-        borderRadius: '0.25rem'
+    <Box
+      ref={viewerContainerRef}
+      w="100%"
+      h="100%"
+      overflow="auto"
+      position="absolute"
+      bg="gray.800"
+      sx={{
+        '.pdfViewer': {
+          paddingTop: '10px',
+          paddingBottom: '10px',
+        },
+        '.page': {
+          marginBottom: '10px',
+          boxShadow: '0 0 10px rgba(0,0,0,0.3)',
+        },
+        '.textLayer': {
+          opacity: 1,
+        },
       }}
-    />
+    >
+      <div className="pdfViewer"></div>
+    </Box>
   )
 }
 

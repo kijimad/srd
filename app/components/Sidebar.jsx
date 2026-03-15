@@ -125,7 +125,6 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
         path: urlParams.file,
         name: fileName,
         initialPage: urlParams.page,
-        initialIsTop: urlParams.isTop
       })
       setHasLoadedFromUrl(true)
     }

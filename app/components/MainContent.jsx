@@ -11,10 +11,10 @@ export default function MainContent() {
   const [sidebarWidth, setSidebarWidth] = useState(320)
   const [currentPdf, setCurrentPdf] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [isTopHalf, setIsTopHalf] = useState(true)
   const [urlParams, setUrlParams] = useState(null)
   const [totalPages, setTotalPages] = useState(0)
-  const [splitMode, setSplitMode] = useState(true) // true: 上下分割, false: 全体表示
+  const [scaleValue, setScaleValue] = useState('page-width')
+  const [currentScale, setCurrentScale] = useState(1)
   const [isResizing, setIsResizing] = useState(false)
   const resizeRef = useRef(null)
 
@@ -23,12 +23,6 @@ export default function MainContent() {
     const saved = localStorage.getItem('sidebarVisible')
     if (saved !== null) {
       setSidebarVisible(saved !== 'false')
-    }
-
-    // Restore split mode from localStorage
-    const savedSplitMode = localStorage.getItem('splitMode')
-    if (savedSplitMode !== null) {
-      setSplitMode(savedSplitMode !== 'false')
     }
 
     // Restore sidebar width from localStorage
@@ -41,13 +35,11 @@ export default function MainContent() {
     const params = new URLSearchParams(window.location.search)
     const fileParam = params.get('file')
     const pageParam = parseInt(params.get('page')) || 1
-    const halfParam = params.get('half') === 'bottom' ? false : true
 
     if (fileParam) {
       setUrlParams({
         file: fileParam,
         page: pageParam,
-        isTop: halfParam
       })
     }
   }, [])
@@ -56,16 +48,6 @@ export default function MainContent() {
     const newValue = !sidebarVisible
     setSidebarVisible(newValue)
     localStorage.setItem('sidebarVisible', newValue)
-  }
-
-  const toggleSplitMode = () => {
-    const newValue = !splitMode
-    setSplitMode(newValue)
-    localStorage.setItem('splitMode', newValue)
-    // 全体表示に切り替えたときは常に上半分状態にリセット
-    if (!newValue) {
-      setIsTopHalf(true)
-    }
   }
 
   const handleResizeStart = useCallback((e) => {
@@ -92,19 +74,55 @@ export default function MainContent() {
   const handlePdfLoad = (pdfInfo) => {
     setCurrentPdf(pdfInfo)
     setCurrentPage(pdfInfo.initialPage || 1)
-    setIsTopHalf(pdfInfo.initialIsTop !== undefined ? pdfInfo.initialIsTop : true)
   }
 
-  const handlePageChange = (newPageNum, newIsTop) => {
+  const handlePageChange = (newPageNum) => {
     setCurrentPage(newPageNum)
-    setIsTopHalf(newIsTop)
+  }
+
+  const handleScaleChange = (newScale) => {
+    setCurrentScale(newScale)
+  }
+
+  const handleScaleValueChange = (newScaleValue) => {
+    setScaleValue(newScaleValue)
+  }
+
+  const handleZoomIn = () => {
+    setScaleValue(currentScale * 1.25)
+  }
+
+  const handleZoomOut = () => {
+    setScaleValue(currentScale / 1.25)
   }
 
   const handlePdfStateUpdate = (state) => {
     if (state.pageNum !== undefined) setCurrentPage(state.pageNum)
-    if (state.isTopHalf !== undefined) setIsTopHalf(state.isTopHalf)
     if (state.totalPages !== undefined) setTotalPages(state.totalPages)
   }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault()
+        handleZoomIn()
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault()
+        handleZoomOut()
+      }
+      if (e.key === '0') {
+        e.preventDefault()
+        setScaleValue('page-width')
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [currentScale])
 
   const displayName = currentPdf?.name
     ? currentPdf.name.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
@@ -117,10 +135,12 @@ export default function MainContent() {
         pdfName={displayName}
         pageNum={currentPage}
         totalPages={totalPages}
-        isTopHalf={isTopHalf}
         onPageChange={handlePageChange}
-        splitMode={splitMode}
-        onToggleSplitMode={toggleSplitMode}
+        scaleValue={scaleValue}
+        currentScale={currentScale}
+        onScaleValueChange={handleScaleValueChange}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
       />
       <Flex flex={1} overflow="hidden">
         <Sidebar
@@ -146,10 +166,10 @@ export default function MainContent() {
           pdfUrl={currentPdf?.url}
           pdfName={currentPdf?.name}
           pageNum={currentPage}
-          isTopHalf={isTopHalf}
-          splitMode={splitMode}
           onPageChange={handlePageChange}
           onStateUpdate={handlePdfStateUpdate}
+          scaleValue={scaleValue}
+          onScaleChange={handleScaleChange}
         />
       </Flex>
     </Flex>

@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Flex, Box, Text, Spinner, VStack } from '@chakra-ui/react'
-import SplitPdfView from './SplitPdfView'
 import FullPdfView from './FullPdfView'
 
-function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitMode, onPageChange, onStateUpdate }) {
+function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, onPageChange, onStateUpdate, scaleValue, onScaleChange }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState(1.0)
 
   const containerRef = useRef(null)
 
@@ -53,85 +51,13 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitM
     const params = new URLSearchParams()
     params.set('file', pdfName)
     params.set('page', pageNum)
-    if (splitMode) {
-      params.set('half', isTopHalf ? 'top' : 'bottom')
-    }
     const newURL = window.location.pathname + '?' + params.toString()
-    window.history.pushState({}, '', newURL)
-  }
-
-  const onPrevPage = () => {
-    if (splitMode) {
-      if (isTopHalf) {
-        if (pageNum <= 1) return
-        onPageChange(pageNum - 1, false)
-      } else {
-        onPageChange(pageNum, true)
-      }
-    } else {
-      if (pageNum <= 1) return
-      onPageChange(pageNum - 1, true)
-    }
-  }
-
-  const onNextPage = () => {
-    if (splitMode) {
-      if (isTopHalf) {
-        onPageChange(pageNum, false)
-      } else {
-        if (pageNum >= pdfDoc?.numPages) return
-        onPageChange(pageNum + 1, true)
-      }
-    } else {
-      if (pageNum >= pdfDoc?.numPages) return
-      onPageChange(pageNum + 1, true)
-    }
-  }
-
-  const handleCanvasClick = (e) => {
-    if (!pdfDoc) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const clickX = e.clientX - rect.left
-    const halfWidth = rect.width / 2
-
-    if (clickX < halfWidth) {
-      onPrevPage()
-    } else {
-      onNextPage()
-    }
-  }
-
-  const handleKeyDown = (e) => {
-    const target = e.target
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-      return
-    }
-
-    if (!pdfDoc) return
-
-    if (e.key === 'ArrowLeft') onPrevPage()
-    if (e.key === 'ArrowRight') {
-      e.preventDefault()
-      onNextPage()
-    }
-    if (e.key === '+' || e.key === '=') {
-      e.preventDefault()
-      setZoomLevel(prev => Math.min(prev * 1.2, 5.0))
-    }
-    if (e.key === '-' || e.key === '_') {
-      e.preventDefault()
-      setZoomLevel(prev => Math.max(prev / 1.2, 0.2))
-    }
-    if (e.key === '0') {
-      e.preventDefault()
-      setZoomLevel(1.0)
-    }
+    window.history.replaceState({}, '', newURL)
   }
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [pdfDoc, pageNum, isTopHalf, splitMode])
+    updateURL()
+  }, [pageNum, pdfName])
 
   useEffect(() => {
     if (pdfName) {
@@ -156,32 +82,17 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitM
       )
     }
 
-    if (splitMode) {
-      return (
-        <SplitPdfView
-          pdfDoc={pdfDoc}
-          pdfjsLib={pdfjsLib}
-          pageNum={pageNum}
-          isTopHalf={isTopHalf}
-          zoomLevel={zoomLevel}
-          containerRef={containerRef}
-          sidebarVisible={sidebarVisible}
-          onRenderComplete={updateURL}
-        />
-      )
-    } else {
-      return (
-        <FullPdfView
-          pdfDoc={pdfDoc}
-          pdfjsLib={pdfjsLib}
-          pageNum={pageNum}
-          zoomLevel={zoomLevel}
-          containerRef={containerRef}
-          sidebarVisible={sidebarVisible}
-          onRenderComplete={updateURL}
-        />
-      )
-    }
+    return (
+      <FullPdfView
+        pdfDoc={pdfDoc}
+        pdfjsLib={pdfjsLib}
+        pageNum={pageNum}
+        scaleValue={scaleValue}
+        sidebarVisible={sidebarVisible}
+        onPageChange={onPageChange}
+        onScaleChange={onScaleChange}
+      />
+    )
   }
 
   return (
@@ -194,12 +105,7 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, isTopHalf, splitM
         alignItems="center"
         overflow="hidden"
         position="relative"
-        pt={1}
-        px={4}
-        pb={4}
-        cursor={pdfUrl ? 'pointer' : 'default'}
         bg="gray.800"
-        onClick={handleCanvasClick}
       >
         {renderPdfView()}
       </Box>

@@ -10,40 +10,65 @@ import {
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
-  Box,
-  Heading
+  Heading,
+  Select,
+  ButtonGroup,
 } from '@chakra-ui/react'
-import { BsLayoutSidebar, BsFilePdfFill, BsViewStacked, BsSquare } from 'react-icons/bs'
+import { BsLayoutSidebar, BsFilePdfFill, BsZoomIn, BsZoomOut } from 'react-icons/bs'
+
+const SCALE_OPTIONS = [
+  { value: 'auto', label: '自動' },
+  { value: 'page-actual', label: '実際のサイズ' },
+  { value: 'page-fit', label: 'ページ全体' },
+  { value: 'page-width', label: 'ページ幅' },
+  { value: '0.5', label: '50%' },
+  { value: '0.75', label: '75%' },
+  { value: '1', label: '100%' },
+  { value: '1.25', label: '125%' },
+  { value: '1.5', label: '150%' },
+  { value: '2', label: '200%' },
+  { value: '3', label: '300%' },
+  { value: '4', label: '400%' },
+]
 
 function Toolbar({
   onToggleSidebar,
   pdfName,
   pageNum,
   totalPages,
-  isTopHalf,
   onPageChange,
-  splitMode,
-  onToggleSplitMode
+  scaleValue,
+  currentScale,
+  onScaleValueChange,
+  onZoomIn,
+  onZoomOut,
 }) {
-  const halfText = isTopHalf ? '上' : '下'
-  const pageInfo = splitMode
-    ? (totalPages > 0 ? `${pageNum} / ${totalPages} (${halfText})` : '')
-    : (totalPages > 0 ? `${pageNum} / ${totalPages}` : '')
-
-  // Calculate slider value
-  const currentSliderValue = splitMode
-    ? (totalPages > 0 ? (pageNum - 1) * 2 + (isTopHalf ? 1 : 2) : 0)
-    : pageNum
-  const maxSliderValue = splitMode ? totalPages * 2 : totalPages
+  const pageInfo = totalPages > 0 ? `${pageNum} / ${totalPages}` : ''
+  const scalePercent = Math.round(currentScale * 100)
 
   const handleSliderChange = (value) => {
-    if (splitMode) {
-      const newPageNum = Math.floor((value - 1) / 2) + 1
-      const newIsTop = value % 2 === 1
-      onPageChange(newPageNum, newIsTop)
+    onPageChange(value)
+  }
+
+  const handleScaleSelectChange = (e) => {
+    const value = e.target.value
+    // Check if it's a number
+    const numValue = parseFloat(value)
+    if (!isNaN(numValue)) {
+      onScaleValueChange(numValue)
     } else {
-      onPageChange(value, true)
+      onScaleValueChange(value)
     }
+  }
+
+  // Get current select value
+  const getSelectValue = () => {
+    if (typeof scaleValue === 'number') {
+      // Find matching option or return empty
+      const match = SCALE_OPTIONS.find(opt => parseFloat(opt.value) === scaleValue)
+      return match ? match.value : ''
+    }
+    return scaleValue
   }
 
   return (
@@ -63,9 +88,9 @@ function Toolbar({
 
       <Flex flex={1} align="center" px={4}>
         <Slider
-          value={currentSliderValue}
+          value={pageNum}
           min={1}
-          max={maxSliderValue}
+          max={totalPages}
           step={1}
           onChange={handleSliderChange}
           isDisabled={totalPages === 0}
@@ -77,18 +102,48 @@ function Toolbar({
         </Slider>
       </Flex>
 
-      <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono" minW="22" textAlign="center">
+      <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono" minW="70px" textAlign="center">
         {pageInfo}
       </Text>
 
-      <IconButton
-        icon={splitMode ? <BsViewStacked /> : <BsSquare />}
-        variant="outline"
-        size="sm"
-        onClick={onToggleSplitMode}
-        title={splitMode ? '全体表示に切替' : '上下分割に切替'}
-        aria-label="Toggle split mode"
-      />
+      <HStack spacing={1}>
+        <ButtonGroup size="sm" isAttached variant="outline">
+          <IconButton
+            icon={<BsZoomOut />}
+            onClick={onZoomOut}
+            aria-label="Zoom out"
+            title="縮小"
+          />
+          <IconButton
+            icon={<BsZoomIn />}
+            onClick={onZoomIn}
+            aria-label="Zoom in"
+            title="拡大"
+          />
+        </ButtonGroup>
+
+        <Select
+          size="sm"
+          w="120px"
+          value={getSelectValue()}
+          onChange={handleScaleSelectChange}
+          bg="gray.800"
+          borderColor="gray.600"
+        >
+          {SCALE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+          {typeof scaleValue === 'number' && !SCALE_OPTIONS.find(opt => parseFloat(opt.value) === scaleValue) && (
+            <option value={scaleValue}>{scalePercent}%</option>
+          )}
+        </Select>
+
+        <Text fontSize="sm" color="gray.400" fontFamily="mono" minW="50px" textAlign="center">
+          {scalePercent}%
+        </Text>
+      </HStack>
 
       <IconButton
         icon={<BsLayoutSidebar />}
