@@ -20,17 +20,10 @@ FROM node:25-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm install --production
-
-# Copy built application from builder
-COPY --from=builder /app/.next ./.next
+# Copy standalone build
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/app ./app
-COPY --from=builder /app/next.config.js ./next.config.js
 
 # Create pdfs directory for mounting
 RUN mkdir -p /pdfs
@@ -41,5 +34,6 @@ ENV PDF_DIR=/pdfs
 # Expose port
 EXPOSE 8000
 
-# Start Next.js production server
-CMD ["npm", "start"]
+# Start Next.js standalone server
+ENV PORT=8000
+CMD ["node", "server.js"]
