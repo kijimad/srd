@@ -46,27 +46,20 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, onPageChange, onS
     }
   }
 
-  const updateURL = () => {
-    if (!pdfDoc || !pdfName) return
-    const params = new URLSearchParams()
-    params.set('file', pdfName)
-    params.set('page', pageNum)
-    const newURL = window.location.pathname + '?' + params.toString()
-    window.history.replaceState({}, '', newURL)
-  }
-
-  useEffect(() => {
-    updateURL()
-  }, [pageNum, pdfName])
-
   useEffect(() => {
     if (pdfName) {
+      const params = new URLSearchParams()
+      params.set('file', pdfName)
+      params.set('page', pageNum)
+      const newURL = window.location.pathname + '?' + params.toString()
+      window.history.replaceState({}, '', newURL)
+
       const displayName = pdfName.replace(/\d{8}T\d{6}--/g, '').replace(/\.[^.]+$/, '')
       document.title = displayName + ' - Theater'
     } else {
       document.title = 'Theater'
     }
-  }, [pdfName])
+  }, [pageNum, pdfName])
 
   const renderPdfView = () => {
     if (!pdfUrl) {
