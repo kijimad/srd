@@ -47,10 +47,12 @@ const RowComponent = memo(function RowComponent({ index, style, items, currentPd
           <Text
             fontSize="sm"
             fontWeight={item.type === 'directory' ? 'medium' : 'normal'}
-            noOfLines={1}
+            overflow="hidden"
+            textOverflow="ellipsis"
+            whiteSpace="nowrap"
             title={item.name}
           >
-            {item.name}
+            {item.name.replace(/^\d{8}T\d{6}(--|\d+_)/, '').replace(/\.pdf$/i, '')}
           </Text>
         </HStack>
       </Box>
