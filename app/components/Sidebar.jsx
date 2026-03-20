@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
-import { Box, VStack, HStack, Text, Icon, IconButton, Flex, Input, Spinner } from '@chakra-ui/react'
+import { useState, useEffect, useRef, useCallback, memo, useReducer } from 'react'
+import { Box, VStack, HStack, Text, Icon, IconButton, Flex, Input } from '@chakra-ui/react'
 import { BsFilePdfFill, BsFolderFill, BsFolder2Open, BsArrowLeft } from 'react-icons/bs'
 import { List } from 'react-window'
 import { useDebounce } from '../hooks/useDebounce'
@@ -9,19 +9,28 @@ import { useDebounce } from '../hooks/useDebounce'
 const ITEM_HEIGHT = 40
 const PAGE_LIMIT = 50
 
-const RowComponent = memo(function RowComponent({ index, style, items, currentPdfPath, hasMore, onItemClick }) {
-  // Loading indicator at the end
-  if (index >= items.length) {
-    return (
-      <div style={style}>
-        <Box display="flex" alignItems="center" justifyContent="center" h="100%">
-          <Spinner size="sm" color="gray.500" />
-        </Box>
-      </div>
-    )
+function makePageKey(dirPath, query, pageNum) {
+  return `${dirPath}:${query}:${pageNum}`
+}
+
+function buildBrowseParams(dirPath, pageNum, { query, focus } = {}) {
+  const params = new URLSearchParams({
+    path: dirPath,
+    page: String(pageNum),
+    limit: String(PAGE_LIMIT)
+  })
+  if (query) params.set('q', query)
+  if (focus) params.set('focus', focus)
+  return params
+}
+
+const RowComponent = memo(function RowComponent({ index, style, itemsMap, currentPdfPath, onItemClick }) {
+  const item = itemsMap[index]
+
+  if (!item) {
+    return <div style={style} />
   }
 
-  const item = items[index]
   const isSelected = currentPdfPath === item.path
 
   return (
@@ -62,109 +71,148 @@ const RowComponent = memo(function RowComponent({ index, style, items, currentPd
 
 function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams }) {
   const [currentPath, setCurrentPath] = useState('.')
-  const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [isLoading, setIsLoading] = useState(false)
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const initialLoadDone = useRef(false)
+
+  const itemsMapRef = useRef({})
+  const loadedPagesRef = useRef(new Set())
+  const loadingPagesRef = useRef(new Set())
+  const [, forceUpdate] = useReducer(x => x + 1, 0)
 
   const listRef = useRef(null)
   const debouncedQuery = useDebounce(searchQuery, 300)
 
-  const loadDirectory = useCallback(async (path = '.', pageNum = 1, query = '', append = false) => {
-    if (isLoading) return
-    setIsLoading(true)
+  // Core fetch: load a single page and merge into itemsMap
+  const fetchPage = useCallback(async (dirPath, pageNum, query = '', extraParams = {}) => {
+    const params = buildBrowseParams(dirPath, pageNum, { query, ...extraParams })
+    const response = await fetch(`/api/browse?${params}`)
+    const data = await response.json()
 
+    data.items.forEach((item, i) => {
+      itemsMapRef.current[data.offset + i] = item
+    })
+    loadedPagesRef.current.add(makePageKey(dirPath, query, pageNum))
+
+    return data
+  }, [])
+
+  const loadPage = useCallback(async (dirPath, pageNum, query = '') => {
+    const pageKey = makePageKey(dirPath, query, pageNum)
+    if (loadedPagesRef.current.has(pageKey) || loadingPagesRef.current.has(pageKey)) return
+
+    loadingPagesRef.current.add(pageKey)
     try {
-      const params = new URLSearchParams({
-        path,
-        page: pageNum.toString(),
-        limit: PAGE_LIMIT.toString()
-      })
-      if (query) params.set('q', query)
-
-      const response = await fetch(`/api/browse?${params}`)
-      const data = await response.json()
-
+      const data = await fetchPage(dirPath, pageNum, query)
       setCurrentPath(data.currentPath)
       setTotal(data.total)
-      setHasMore(data.hasMore)
-      setPage(pageNum)
-
-      if (append) {
-        setItems(prev => [...prev, ...data.items])
-      } else {
-        setItems(data.items)
-      }
+      forceUpdate()
     } catch (error) {
       console.error('Error loading directory:', error)
     } finally {
-      setIsLoading(false)
+      loadingPagesRef.current.delete(pageKey)
     }
-  }, [isLoading])
+  }, [fetchPage])
+
+  const resetAndLoad = useCallback(async (dirPath, query = '') => {
+    itemsMapRef.current = {}
+    loadedPagesRef.current = new Set()
+    loadingPagesRef.current = new Set()
+    setTotal(0)
+
+    try {
+      const data = await fetchPage(dirPath, 1, query)
+      setCurrentPath(data.currentPath)
+      setTotal(data.total)
+      forceUpdate()
+    } catch (error) {
+      console.error('Error loading directory:', error)
+    }
+  }, [fetchPage])
 
   // Initial load
   useEffect(() => {
-    loadDirectory('.', 1, '')
+    if (!urlParams) {
+      resetAndLoad('.', '')
+      initialLoadDone.current = true
+    }
   }, [])
 
-  // Search query change
+  // Search query change (skip the initial mount)
   useEffect(() => {
-    setItems([])
-    setPage(1)
-    setHasMore(true)
-    loadDirectory(currentPath, 1, debouncedQuery)
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      return
+    }
+    resetAndLoad(currentPath, debouncedQuery)
   }, [debouncedQuery])
 
   // Load PDF from URL parameters
   useEffect(() => {
     if (urlParams && !hasLoadedFromUrl) {
+      setHasLoadedFromUrl(true)
+      initialLoadDone.current = true
       const fileName = urlParams.file.split('/').pop()
+      const parentDir = urlParams.file.includes('/')
+        ? urlParams.file.split('/').slice(0, -1).join('/')
+        : '.'
+
       onPdfSelect({
         url: '/api/pdf/' + urlParams.file,
         path: urlParams.file,
         name: fileName,
         initialPage: urlParams.page,
       })
-      setHasLoadedFromUrl(true)
-    }
-  }, [urlParams, hasLoadedFromUrl, onPdfSelect])
 
-  // Scroll to selected item
+      fetchPage(parentDir, 1, '', { focus: fileName })
+        .then(async (data) => {
+          setCurrentPath(data.currentPath)
+          setTotal(data.total)
+
+          if (data.focusIndex != null) {
+            const focusPage = Math.floor(data.focusIndex / PAGE_LIMIT) + 1
+
+            if (focusPage > 1) {
+              await fetchPage(parentDir, focusPage)
+            }
+
+            forceUpdate()
+
+            setTimeout(() => {
+              if (listRef.current) {
+                listRef.current.scrollToRow({ index: data.focusIndex, align: 'center' })
+              }
+            }, 50)
+          } else {
+            forceUpdate()
+          }
+        })
+        .catch(error => console.error('Error loading from URL:', error))
+    }
+  }, [urlParams, hasLoadedFromUrl, onPdfSelect, fetchPage])
+
+  // Scroll to selected item when it becomes available in itemsMap
   useEffect(() => {
     if (listRef.current && currentPdfPath) {
-      const index = items.findIndex(item => item.path === currentPdfPath)
-      if (index !== -1) {
-        listRef.current.scrollToRow({ index, align: 'center' })
+      const entry = Object.entries(itemsMapRef.current).find(([, item]) => item.path === currentPdfPath)
+      if (entry) {
+        listRef.current.scrollToRow({ index: parseInt(entry[0]), align: 'center' })
       }
     }
-  }, [currentPdfPath, items])
-
-  const loadMore = useCallback(() => {
-    if (!isLoading && hasMore) {
-      loadDirectory(currentPath, page + 1, debouncedQuery, true)
-    }
-  }, [isLoading, hasMore, currentPath, page, debouncedQuery, loadDirectory])
+  }, [currentPdfPath])
 
   const goBack = () => {
     if (currentPath === '.' || currentPath === '') return
     const parentPath = currentPath.split(/[\/\\]/).slice(0, -1).join('/') || '.'
     setSearchQuery('')
-    setItems([])
-    setPage(1)
-    setHasMore(true)
-    loadDirectory(parentPath, 1, '')
+    resetAndLoad(parentPath, '')
   }
 
   const handleItemClick = useCallback((item) => {
     if (item.type === 'directory') {
       setSearchQuery('')
-      setItems([])
-      setPage(1)
-      setHasMore(true)
-      loadDirectory(item.path, 1, '')
+      resetAndLoad(item.path, '')
     } else {
       onPdfSelect({
         url: '/api/pdf/' + item.path,
@@ -174,20 +222,24 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
         initialIsTop: true
       })
     }
-  }, [loadDirectory, onPdfSelect])
+  }, [resetAndLoad, onPdfSelect])
 
-  const handleRowsRendered = useCallback(({ stopIndex }) => {
-    if (stopIndex >= items.length - 10 && hasMore && !isLoading) {
-      loadMore()
+  const handleRowsRendered = useCallback((visibleRows) => {
+    const { startIndex, stopIndex } = visibleRows
+    const startPage = Math.floor(Math.max(0, startIndex - 10) / PAGE_LIMIT) + 1
+    const endPage = Math.floor(Math.min(total - 1, stopIndex + 10) / PAGE_LIMIT) + 1
+
+    for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+      const pageKey = makePageKey(currentPath, debouncedQuery, pageNum)
+      if (!loadedPagesRef.current.has(pageKey)) {
+        loadPage(currentPath, pageNum, debouncedQuery)
+      }
     }
-  }, [items.length, hasMore, isLoading, loadMore])
-
-  const rowCount = items.length + (hasMore ? 1 : 0)
+  }, [total, currentPath, debouncedQuery, loadPage])
 
   const rowProps = {
-    items,
+    itemsMap: itemsMapRef.current,
     currentPdfPath,
-    hasMore,
     onItemClick: handleItemClick
   }
 
@@ -231,15 +283,15 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
         </Text>
       </VStack>
 
-      <Box flex={1} overflow="hidden">
-        {items.length === 0 && !isLoading ? (
+      <Box flex={1} overflow="hidden" position="relative">
+        {total === 0 ? (
           <Text textAlign="center" p={4} color="gray.500">
             No files found
           </Text>
         ) : (
           <List
             listRef={listRef}
-            rowCount={rowCount}
+            rowCount={total}
             rowHeight={ITEM_HEIGHT}
             rowComponent={RowComponent}
             rowProps={rowProps}

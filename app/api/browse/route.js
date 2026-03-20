@@ -9,7 +9,6 @@ function listDirectory(dir, basePath = '') {
     const entries = fs.readdirSync(dir, { withFileTypes: true })
 
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name)
       const relativePath = path.join(basePath, entry.name)
 
       if (entry.isDirectory()) {
@@ -53,11 +52,12 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
-  if (!fs.existsSync(absolutePath)) {
+  let stat
+  try {
+    stat = fs.statSync(absolutePath)
+  } catch {
     return NextResponse.json({ error: 'Directory not found' }, { status: 404 })
   }
-
-  const stat = fs.statSync(absolutePath)
   if (!stat.isDirectory()) {
     return NextResponse.json({ error: 'Not a directory' }, { status: 400 })
   }
@@ -71,6 +71,15 @@ export async function GET(request) {
   }
 
   const total = items.length
+
+  // focus: find the index of a specific file and return its page
+  const focus = searchParams.get('focus')
+  let focusIndex = null
+  if (focus) {
+    focusIndex = items.findIndex(item => item.name === focus)
+    if (focusIndex === -1) focusIndex = null
+  }
+
   const startIndex = (page - 1) * limit
   const endIndex = startIndex + limit
   const paginatedItems = items.slice(startIndex, endIndex)
@@ -82,6 +91,8 @@ export async function GET(request) {
     total,
     page,
     limit,
-    hasMore
+    hasMore,
+    offset: startIndex,
+    ...(focusIndex !== null && { focusIndex })
   })
 }
