@@ -9,10 +9,6 @@ import { useDebounce } from '../hooks/useDebounce'
 const ITEM_HEIGHT = 40
 const PAGE_LIMIT = 50
 
-function makePageKey(dirPath, query, pageNum) {
-  return `${dirPath}:${query}:${pageNum}`
-}
-
 function buildBrowseParams(dirPath, pageNum, { query, focus } = {}) {
   const params = new URLSearchParams({
     path: dirPath,
@@ -24,8 +20,14 @@ function buildBrowseParams(dirPath, pageNum, { query, focus } = {}) {
   return params
 }
 
-const RowComponent = memo(function RowComponent({ index, style, itemsMap, currentPdfPath, onItemClick }) {
-  const item = itemsMap[index]
+async function fetchBrowsePage(dirPath, pageNum, opts = {}) {
+  const params = buildBrowseParams(dirPath, pageNum, opts)
+  const response = await fetch(`/api/browse?${params}`)
+  return response.json()
+}
+
+const RowComponent = memo(function RowComponent({ index, style, items, currentPdfPath, onItemClick }) {
+  const item = items[index]
 
   if (!item) {
     return <div style={style} />
@@ -72,64 +74,90 @@ const RowComponent = memo(function RowComponent({ index, style, itemsMap, curren
 function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams }) {
   const [currentPath, setCurrentPath] = useState('.')
   const [total, setTotal] = useState(0)
-  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const initialLoadDone = useRef(false)
+  const hasLoadedFromUrl = useRef(false)
 
-  const itemsMapRef = useRef({})
-  const loadedPagesRef = useRef(new Set())
-  const loadingPagesRef = useRef(new Set())
+  const itemsRef = useRef([])
+  const firstLoadedPage = useRef(1)
+  const lastLoadedPage = useRef(1)
+  const hasMoreDown = useRef(true)
+  const loadingNextRef = useRef(false)
+  const loadingPrevRef = useRef(false)
   const [, forceUpdate] = useReducer(x => x + 1, 0)
 
   const listRef = useRef(null)
   const debouncedQuery = useDebounce(searchQuery, 300)
 
-  // Core fetch: load a single page and merge into itemsMap
-  const fetchPage = useCallback(async (dirPath, pageNum, query = '', extraParams = {}) => {
-    const params = buildBrowseParams(dirPath, pageNum, { query, ...extraParams })
-    const response = await fetch(`/api/browse?${params}`)
-    const data = await response.json()
-
-    data.items.forEach((item, i) => {
-      itemsMapRef.current[data.offset + i] = item
-    })
-    loadedPagesRef.current.add(makePageKey(dirPath, query, pageNum))
-
-    return data
+  // Apply browse result to pagination state
+  const applyResult = useCallback((data, page) => {
+    itemsRef.current = data.items
+    firstLoadedPage.current = page
+    lastLoadedPage.current = page
+    hasMoreDown.current = data.hasMore
+    setCurrentPath(data.currentPath)
+    setTotal(data.total)
   }, [])
 
-  const loadPage = useCallback(async (dirPath, pageNum, query = '') => {
-    const pageKey = makePageKey(dirPath, query, pageNum)
-    if (loadedPagesRef.current.has(pageKey) || loadingPagesRef.current.has(pageKey)) return
+  const loadNextPage = useCallback(async (dirPath, query = '') => {
+    if (loadingNextRef.current || !hasMoreDown.current) return
+    loadingNextRef.current = true
 
-    loadingPagesRef.current.add(pageKey)
     try {
-      const data = await fetchPage(dirPath, pageNum, query)
-      setCurrentPath(data.currentPath)
+      const nextPage = lastLoadedPage.current + 1
+      const data = await fetchBrowsePage(dirPath, nextPage, { query })
+
       setTotal(data.total)
+      itemsRef.current.push(...data.items)
+      hasMoreDown.current = data.hasMore
+      lastLoadedPage.current = nextPage
       forceUpdate()
     } catch (error) {
       console.error('Error loading directory:', error)
     } finally {
-      loadingPagesRef.current.delete(pageKey)
+      loadingNextRef.current = false
     }
-  }, [fetchPage])
+  }, [])
+
+  const loadPrevPage = useCallback(async (dirPath, query = '') => {
+    if (loadingPrevRef.current || firstLoadedPage.current <= 1) return
+    loadingPrevRef.current = true
+
+    try {
+      const prevPage = firstLoadedPage.current - 1
+      const data = await fetchBrowsePage(dirPath, prevPage, { query })
+
+      const prevCount = data.items.length
+      itemsRef.current.unshift(...data.items)
+      firstLoadedPage.current = prevPage
+      forceUpdate()
+
+      requestAnimationFrame(() => {
+        if (listRef.current) {
+          listRef.current.scrollToRow({ index: prevCount, align: 'start' })
+        }
+      })
+    } catch (error) {
+      console.error('Error loading directory:', error)
+    } finally {
+      loadingPrevRef.current = false
+    }
+  }, [])
 
   const resetAndLoad = useCallback(async (dirPath, query = '') => {
-    itemsMapRef.current = {}
-    loadedPagesRef.current = new Set()
-    loadingPagesRef.current = new Set()
+    itemsRef.current = []
+    loadingNextRef.current = false
+    loadingPrevRef.current = false
     setTotal(0)
 
     try {
-      const data = await fetchPage(dirPath, 1, query)
-      setCurrentPath(data.currentPath)
-      setTotal(data.total)
+      const data = await fetchBrowsePage(dirPath, 1, { query })
+      applyResult(data, 1)
       forceUpdate()
     } catch (error) {
       console.error('Error loading directory:', error)
     }
-  }, [fetchPage])
+  }, [applyResult])
 
   // Initial load
   useEffect(() => {
@@ -150,54 +178,57 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
 
   // Load PDF from URL parameters
   useEffect(() => {
-    if (urlParams && !hasLoadedFromUrl) {
-      setHasLoadedFromUrl(true)
-      initialLoadDone.current = true
-      const fileName = urlParams.file.split('/').pop()
-      const parentDir = urlParams.file.includes('/')
-        ? urlParams.file.split('/').slice(0, -1).join('/')
-        : '.'
+    if (!urlParams || hasLoadedFromUrl.current) return
+    hasLoadedFromUrl.current = true
+    initialLoadDone.current = true
 
-      onPdfSelect({
-        url: '/api/pdf/' + urlParams.file,
-        path: urlParams.file,
-        name: fileName,
-        initialPage: urlParams.page,
-      })
+    const fileName = urlParams.file.split('/').pop()
+    const parentDir = urlParams.file.includes('/')
+      ? urlParams.file.split('/').slice(0, -1).join('/')
+      : '.'
 
-      fetchPage(parentDir, 1, '', { focus: fileName })
-        .then(async (data) => {
-          setCurrentPath(data.currentPath)
-          setTotal(data.total)
+    onPdfSelect({
+      url: '/api/pdf/' + urlParams.file,
+      path: urlParams.file,
+      name: fileName,
+      initialPage: urlParams.page,
+    })
 
-          if (data.focusIndex != null) {
-            const focusPage = Math.floor(data.focusIndex / PAGE_LIMIT) + 1
+    ;(async () => {
+      try {
+        const data = await fetchBrowsePage(parentDir, 1, { focus: fileName })
+        const focusPage = data.focusIndex != null
+          ? Math.floor(data.focusIndex / PAGE_LIMIT) + 1
+          : 1
 
-            if (focusPage > 1) {
-              await fetchPage(parentDir, focusPage)
+        if (focusPage > 1) {
+          const focusData = await fetchBrowsePage(parentDir, focusPage)
+          applyResult(focusData, focusPage)
+        } else {
+          applyResult(data, 1)
+        }
+        forceUpdate()
+
+        if (data.focusIndex != null) {
+          const localIndex = data.focusIndex - (focusPage - 1) * PAGE_LIMIT
+          setTimeout(() => {
+            if (listRef.current) {
+              listRef.current.scrollToRow({ index: localIndex, align: 'center' })
             }
+          }, 50)
+        }
+      } catch (error) {
+        console.error('Error loading from URL:', error)
+      }
+    })()
+  }, [urlParams, onPdfSelect, applyResult])
 
-            forceUpdate()
-
-            setTimeout(() => {
-              if (listRef.current) {
-                listRef.current.scrollToRow({ index: data.focusIndex, align: 'center' })
-              }
-            }, 50)
-          } else {
-            forceUpdate()
-          }
-        })
-        .catch(error => console.error('Error loading from URL:', error))
-    }
-  }, [urlParams, hasLoadedFromUrl, onPdfSelect, fetchPage])
-
-  // Scroll to selected item when it becomes available in itemsMap
+  // Scroll to selected item
   useEffect(() => {
     if (listRef.current && currentPdfPath) {
-      const entry = Object.entries(itemsMapRef.current).find(([, item]) => item.path === currentPdfPath)
-      if (entry) {
-        listRef.current.scrollToRow({ index: parseInt(entry[0]), align: 'center' })
+      const index = itemsRef.current.findIndex(item => item.path === currentPdfPath)
+      if (index !== -1) {
+        listRef.current.scrollToRow({ index, align: 'center' })
       }
     }
   }, [currentPdfPath])
@@ -226,19 +257,16 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
 
   const handleRowsRendered = useCallback((visibleRows) => {
     const { startIndex, stopIndex } = visibleRows
-    const startPage = Math.floor(Math.max(0, startIndex - 10) / PAGE_LIMIT) + 1
-    const endPage = Math.floor(Math.min(total - 1, stopIndex + 10) / PAGE_LIMIT) + 1
-
-    for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
-      const pageKey = makePageKey(currentPath, debouncedQuery, pageNum)
-      if (!loadedPagesRef.current.has(pageKey)) {
-        loadPage(currentPath, pageNum, debouncedQuery)
-      }
+    if (stopIndex >= itemsRef.current.length - 10) {
+      loadNextPage(currentPath, debouncedQuery)
     }
-  }, [total, currentPath, debouncedQuery, loadPage])
+    if (startIndex <= 5) {
+      loadPrevPage(currentPath, debouncedQuery)
+    }
+  }, [currentPath, debouncedQuery, loadNextPage, loadPrevPage])
 
   const rowProps = {
-    itemsMap: itemsMapRef.current,
+    items: itemsRef.current,
     currentPdfPath,
     onItemClick: handleItemClick
   }
@@ -283,15 +311,15 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
         </Text>
       </VStack>
 
-      <Box flex={1} overflow="hidden" position="relative">
-        {total === 0 ? (
+      <Box flex={1} overflow="hidden">
+        {itemsRef.current.length === 0 && total === 0 ? (
           <Text textAlign="center" p={4} color="gray.500">
             No files found
           </Text>
         ) : (
           <List
             listRef={listRef}
-            rowCount={total}
+            rowCount={itemsRef.current.length}
             rowHeight={ITEM_HEIGHT}
             rowComponent={RowComponent}
             rowProps={rowProps}
