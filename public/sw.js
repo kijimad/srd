@@ -16,8 +16,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
   if (url.origin !== self.location.origin) return
-  if (url.pathname.startsWith('/api/')) return
 
+  // Navigation: network-first, fallback to cached /
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -31,7 +31,9 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // JS/CSS/images: cache-first
+  // Only cache Next.js static assets
+  if (!url.pathname.startsWith('/_next/static/')) return
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached
