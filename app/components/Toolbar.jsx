@@ -8,7 +8,6 @@ import {
   Heading,
   Select,
   ButtonGroup,
-  Spacer,
 } from '@chakra-ui/react'
 import { BsLayoutSidebar, BsFilePdfFill, BsZoomIn, BsZoomOut } from 'react-icons/bs'
 
@@ -67,18 +66,18 @@ function Toolbar({
       spacing={3}
       backdropFilter="blur(0.5rem)"
     >
-      <Heading size="md" display="flex" alignItems="center" gap={2}>
-        <Icon as={BsFilePdfFill} color="blue.400" />
-        {pdfName}
+      <Heading size="md" display="flex" alignItems="center" gap={2} minW={0} flex={1}>
+        <Icon as={BsFilePdfFill} color="blue.400" flexShrink={0} />
+        <Text as="span" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+          {pdfName}
+        </Text>
       </Heading>
-
-      <Spacer />
 
       <Text fontSize="sm" color="gray.400" fontWeight="medium" fontFamily="mono">
         {pageInfo}
       </Text>
 
-      <HStack spacing={1}>
+      <HStack spacing={1} flexShrink={0}>
         <ButtonGroup size="sm" isAttached variant="outline">
           <IconButton
             icon={<BsZoomOut />}
