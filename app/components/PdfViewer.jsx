@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Flex, Box, Text, Spinner, VStack } from '@chakra-ui/react'
 import FullPdfView from './FullPdfView'
+import { cachePdf, getCachedPdf } from '../caches/pdfCache'
 
-function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, onPageChange, onStateUpdate, scaleValue, onScaleChange }) {
+function PdfViewer({ sidebarVisible, pdfUrl, pdfPath, pdfName, pageNum, onPageChange, onStateUpdate, scaleValue, onScaleChange }) {
   const [pdfjsLib, setPdfjsLib] = useState(null)
   const [pdfDoc, setPdfDoc] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-
-  const containerRef = useRef(null)
 
   useEffect(() => {
     import('pdfjs-dist').then((pdfjs) => {
@@ -29,16 +28,34 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, onPageChange, onS
     setPdfDoc(null)
     setIsLoading(true)
     try {
-      const loadingTask = pdfjsLib.getDocument({
-        url: url,
+      const opts = {
         cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/cmaps/',
         cMapPacked: true,
         standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/standard_fonts/',
         wasmUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/wasm/',
-      })
-      const doc = await loadingTask.promise
+      }
+
+      let doc
+      let loadedFromNetwork = false
+      try {
+        doc = await pdfjsLib.getDocument({ url, ...opts }).promise
+        loadedFromNetwork = true
+      } catch {
+        // Network failed, try cache
+        const blob = pdfPath ? await getCachedPdf(pdfPath) : null
+        if (!blob) throw new Error('PDF not available offline')
+        doc = await pdfjsLib.getDocument({ data: await blob.arrayBuffer(), ...opts }).promise
+      }
+
       setPdfDoc(doc)
       onStateUpdate({ totalPages: doc.numPages })
+
+      // Cache after successful network load
+      if (loadedFromNetwork && pdfPath) {
+        doc.getData().then((data) => {
+          cachePdf(pdfPath, new Blob([data], { type: 'application/pdf' }))
+        }).catch(() => {})
+      }
     } catch (error) {
       console.error('Error loading PDF:', error)
     } finally {
@@ -91,7 +108,6 @@ function PdfViewer({ sidebarVisible, pdfUrl, pdfName, pageNum, onPageChange, onS
   return (
     <Flex flex={1} direction="column" bg="gray.800" position="relative">
       <Box
-        ref={containerRef}
         flex={1}
         display="flex"
         justifyContent="center"

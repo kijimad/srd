@@ -1,0 +1,16 @@
+{
+  "name": "Theater",
+  "short_name": "Theater",
+  "description": "PDF Slide Viewer",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a202c",
+  "theme_color": "#1a202c",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

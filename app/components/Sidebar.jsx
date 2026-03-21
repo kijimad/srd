@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback, memo, useReducer } from 'react'
 import { Box, VStack, HStack, Text, Icon, IconButton, Flex, Input } from '@chakra-ui/react'
-import { BsFilePdfFill, BsFolderFill, BsFolder2Open, BsArrowLeft } from 'react-icons/bs'
+import { BsFilePdfFill, BsFolderFill, BsFolder2Open, BsArrowLeft, BsCloudSlash } from 'react-icons/bs'
 import { List } from 'react-window'
 import { useDebounce } from '../hooks/useDebounce'
+import { listCachedPdfs } from '../caches/pdfCache'
 
 const ITEM_HEIGHT = 40
 const PAGE_LIMIT = 50
@@ -75,6 +76,7 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
   const [currentPath, setCurrentPath] = useState('.')
   const [total, setTotal] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  const [offline, setOffline] = useState(false)
   const initialLoadDone = useRef(false)
   const hasLoadedFromUrl = useRef(false)
 
@@ -144,11 +146,33 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
     }
   }, [])
 
+  const loadCachedPdfs = useCallback(async (query = '') => {
+    let pdfs
+    try {
+      const metas = await listCachedPdfs()
+      pdfs = metas.map((m) => ({ type: 'file', name: m.name, path: m.path }))
+    } catch {
+      pdfs = []
+    }
+    const filtered = query
+      ? pdfs.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+      : pdfs
+    itemsRef.current = filtered
+    firstLoadedPage.current = 1
+    lastLoadedPage.current = 1
+    hasMoreDown.current = false
+    setCurrentPath('offline')
+    setTotal(filtered.length)
+    setOffline(true)
+    forceUpdate()
+  }, [])
+
   const resetAndLoad = useCallback(async (dirPath, query = '') => {
     itemsRef.current = []
     loadingNextRef.current = false
     loadingPrevRef.current = false
     setTotal(0)
+    setOffline(false)
 
     try {
       const data = await fetchBrowsePage(dirPath, 1, { query })
@@ -156,8 +180,9 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
       forceUpdate()
     } catch (error) {
       console.error('Error loading directory:', error)
+      loadCachedPdfs(query)
     }
-  }, [applyResult])
+  }, [applyResult, loadCachedPdfs])
 
   // Initial load
   useEffect(() => {
@@ -173,7 +198,11 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
       initialLoadDone.current = true
       return
     }
-    resetAndLoad(currentPath, debouncedQuery)
+    if (offline) {
+      loadCachedPdfs(debouncedQuery)
+    } else {
+      resetAndLoad(currentPath, debouncedQuery)
+    }
   }, [debouncedQuery])
 
   // Load PDF from URL parameters
@@ -241,10 +270,10 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
   }
 
   const handleItemClick = useCallback((item) => {
-    if (item.type === 'directory') {
+    if (item.type === 'directory' && !offline) {
       setSearchQuery('')
       resetAndLoad(item.path, '')
-    } else {
+    } else if (item.type === 'file') {
       onPdfSelect({
         url: '/api/pdf/' + item.path,
         path: item.path,
@@ -253,9 +282,10 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
         initialIsTop: true
       })
     }
-  }, [resetAndLoad, onPdfSelect])
+  }, [resetAndLoad, onPdfSelect, offline])
 
   const handleRowsRendered = useCallback((visibleRows) => {
+    if (offline) return
     const { startIndex, stopIndex } = visibleRows
     if (stopIndex >= itemsRef.current.length - 10) {
       loadNextPage(currentPath, debouncedQuery)
@@ -263,7 +293,7 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
     if (startIndex <= 5) {
       loadPrevPage(currentPath, debouncedQuery)
     }
-  }, [currentPath, debouncedQuery, loadNextPage, loadPrevPage])
+  }, [currentPath, debouncedQuery, loadNextPage, loadPrevPage, offline])
 
   const rowProps = {
     items: itemsRef.current,
@@ -288,12 +318,12 @@ function Sidebar({ visible, width = 320, onPdfSelect, currentPdfPath, urlParams 
             size="sm"
             variant="outline"
             onClick={goBack}
-            isDisabled={currentPath === '.' || currentPath === ''}
+            isDisabled={offline || currentPath === '.' || currentPath === ''}
             aria-label="Go back"
           />
           <Flex flex={1} align="center" gap={2} overflow="hidden">
-            <Icon as={BsFolder2Open} color="yellow.600" fontSize="sm" />
-            <Text fontSize="sm" color="gray.400" noOfLines={1}>{currentPath}</Text>
+            <Icon as={offline ? BsCloudSlash : BsFolder2Open} color={offline ? 'gray.500' : 'yellow.600'} fontSize="sm" />
+            <Text fontSize="sm" color="gray.400" noOfLines={1}>{offline ? 'Offline' : currentPath}</Text>
           </Flex>
         </HStack>
         <Input
