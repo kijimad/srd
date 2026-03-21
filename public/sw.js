@@ -15,6 +15,24 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
+
+  // Cache pdfjs CDN resources (cmaps, fonts, wasm, worker)
+  if (url.hostname === 'cdn.jsdelivr.net' && url.pathname.includes('pdfjs-dist')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached
+        return fetch(event.request).then((res) => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(SHELL_CACHE).then((c) => c.put(event.request, clone))
+          }
+          return res
+        })
+      })
+    )
+    return
+  }
+
   if (url.origin !== self.location.origin) return
 
   // Navigation: network-first, fallback to cached /
