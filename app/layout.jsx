@@ -7,7 +7,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
       </head>
       <body suppressHydrationWarning>
         {children}
