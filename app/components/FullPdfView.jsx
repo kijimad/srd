@@ -43,6 +43,7 @@ function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, on
           linkService: pdfLinkService,
           textLayerMode: 2,
           removePageBorders: true,
+          maxCanvasPixels: -1,
         })
 
         pdfLinkService.setViewer(pdfViewer)
