@@ -174,7 +174,7 @@ function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, on
       >
         <div className="pdfViewer"></div>
       </Box>
-      <VStack position="absolute" bottom="16px" right="16px" spacing={2} zIndex={10}>
+      <VStack position="absolute" top={4} right={8} spacing={2} zIndex={10}>
         <NavButton icon={<BsChevronUp />} onClick={() => scrollByViewport(-1)} label="前へ（表示領域分）" />
         <NavButton icon={<BsChevronDown />} onClick={() => scrollByViewport(1)} label="次へ（表示領域分）" />
       </VStack>
