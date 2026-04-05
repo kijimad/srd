@@ -144,8 +144,9 @@ function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, on
   const scrollByViewport = (direction) => {
     const container = viewerContainerRef.current
     if (!container) return
+    const visibleHeight = window.visualViewport?.height ?? container.clientHeight
     const overlap = 40
-    const delta = Math.max(container.clientHeight - overlap, 100)
+    const delta = Math.max(visibleHeight - overlap, 100)
     container.scrollBy({ top: delta * direction })
   }
 
