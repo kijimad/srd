@@ -1,8 +1,26 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Box } from '@chakra-ui/react'
+import { Box, IconButton, VStack } from '@chakra-ui/react'
+import { BsChevronUp, BsChevronDown } from 'react-icons/bs'
 import 'pdfjs-dist/web/pdf_viewer.css'
+
+function NavButton({ icon, onClick, label }) {
+  return (
+    <IconButton
+      icon={icon}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      size="md"
+      isRound
+      bg="blackAlpha.700"
+      color="white"
+      _hover={{ bg: 'blackAlpha.800' }}
+      boxShadow="md"
+    />
+  )
+}
 
 function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, onPageChange, onScaleChange }) {
   const viewerContainerRef = useRef(null)
@@ -64,8 +82,8 @@ function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, on
           } else {
             pdfViewer.currentScaleValue = scaleValue || 'page-width'
           }
-          // Set initial page
-          if (initialPageRef.current && initialPageRef.current > 0) {
+          // Clamp to pagesCount; pdf.js logs an error for out-of-range pages.
+          if (initialPageRef.current > 0 && initialPageRef.current <= pdfViewer.pagesCount) {
             pdfViewer.currentPageNumber = initialPageRef.current
           }
         })
@@ -110,15 +128,6 @@ function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, on
     }
   }, [scaleValue, viewerReady])
 
-  // Handle page changes from external source (slider)
-  useEffect(() => {
-    if (!viewerRef.current || !viewerReady) return
-
-    if (viewerRef.current.currentPageNumber !== pageNum) {
-      viewerRef.current.currentPageNumber = pageNum
-    }
-  }, [pageNum, viewerReady])
-
   // Trigger resize when sidebar toggles
   useEffect(() => {
     if (!viewerRef.current || !viewerReady) return
@@ -132,30 +141,44 @@ function FullPdfView({ pdfDoc, pdfjsLib, pageNum, scaleValue, sidebarVisible, on
     return () => clearTimeout(timer)
   }, [sidebarVisible, viewerReady])
 
+  const scrollByViewport = (direction) => {
+    const container = viewerContainerRef.current
+    if (!container) return
+    const overlap = 40
+    const delta = Math.max(container.clientHeight - overlap, 100)
+    container.scrollBy({ top: delta * direction })
+  }
+
   return (
-    <Box
-      ref={viewerContainerRef}
-      w="100%"
-      h="100%"
-      overflow="auto"
-      position="absolute"
-      bg="gray.800"
-      sx={{
-        '.pdfViewer': {
-          paddingTop: '10px',
-          paddingBottom: '10px',
-        },
-        '.page': {
-          marginBottom: '10px',
-          boxShadow: '0 0 10px rgba(0,0,0,0.3)',
-        },
-        '.textLayer': {
-          opacity: 1,
-        },
-      }}
-    >
-      <div className="pdfViewer"></div>
-    </Box>
+    <>
+      <Box
+        ref={viewerContainerRef}
+        w="100%"
+        h="100%"
+        overflow="auto"
+        position="absolute"
+        bg="gray.800"
+        sx={{
+          '.pdfViewer': {
+            paddingTop: '10px',
+            paddingBottom: '10px',
+          },
+          '.page': {
+            marginBottom: '10px',
+            boxShadow: '0 0 10px rgba(0,0,0,0.3)',
+          },
+          '.textLayer': {
+            opacity: 1,
+          },
+        }}
+      >
+        <div className="pdfViewer"></div>
+      </Box>
+      <VStack position="absolute" bottom="16px" right="16px" spacing={2} zIndex={10}>
+        <NavButton icon={<BsChevronUp />} onClick={() => scrollByViewport(-1)} label="前へ（表示領域分）" />
+        <NavButton icon={<BsChevronDown />} onClick={() => scrollByViewport(1)} label="次へ（表示領域分）" />
+      </VStack>
+    </>
   )
 }
 
