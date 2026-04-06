@@ -129,7 +129,7 @@ export default function MainContent() {
     : '----'
 
   return (
-    <Flex h="100vh" overflow="hidden" direction="column">
+    <Flex h="100dvh" overflow="hidden" direction="column">
       <Toolbar
         onToggleSidebar={toggleSidebar}
         pdfName={displayName}
